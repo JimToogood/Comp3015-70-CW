@@ -24,9 +24,10 @@ public:
 
     void initScene(GLFWwindow* window);
     void initSceneFBO(int windowWidth, int windowHeight);
+    void initShadowFBO();
     void update(float t);
     void render();
-    void renderSceneObjects();
+    void renderSceneObjects(bool isShadowPass);
     void resize(int, int);
 
 private:
@@ -50,9 +51,8 @@ private:
 
     mat4 lightPV;
     mat4 shadowBias;
-
-    GLuint shadowFBO;
-    GLuint shadowDepthTex;
+    mat4 lightView;
+    mat4 lightProjection;
 
     GLuint skyboxDayTexture;
     GLuint skyboxNightTexture;
@@ -60,6 +60,9 @@ private:
     GLuint groundTexture;
     GLuint groundNormal;
     GLuint lampTexture;
+
+    GLuint shadowFBO;
+    GLuint shadowDepthTex;
 
     GLuint sceneFBO;
     GLuint sceneColourTex;
@@ -73,7 +76,7 @@ private:
     float timeOfDay;
     float dayLength;
 
-    void setMatrices(mat4 model);
+    void setMatrices(mat4 model, bool isShadowPass);
     void compile();
 };
 

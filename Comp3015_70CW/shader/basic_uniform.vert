@@ -10,10 +10,12 @@ layout (location = 3) in vec4 VertexTangent;
 out vec3 FragPos;
 out vec2 TexCoord;
 out mat3 TBN;
+out vec4 ShadowCoord;
 
 // Matrices
 uniform mat4 ModelMatrix;
 uniform mat3 NormalMatrix;
+uniform mat4 ShadowMatrix;
 uniform mat4 MVP;
 
 
@@ -30,6 +32,8 @@ void main() {
     vec3 B = cross(N, T) * VertexTangent.w;
 
     TBN = mat3(T, B, N);
+
+    ShadowCoord = ShadowMatrix * vec4(VertexPosition, 1.0f);
 
     gl_Position = MVP * vec4(VertexPosition, 1.0f);
 }

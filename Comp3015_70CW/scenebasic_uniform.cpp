@@ -11,20 +11,24 @@ using namespace glm;
 
 SceneBasic_Uniform::SceneBasic_Uniform() :
     window(nullptr),
-    shadowMapWidth(512),
-    shadowMapHeight(512),
+    shadowMapWidth(2048),
+    shadowMapHeight(2048),
     torus(0.7f, 0.3f, 100, 100),
     plane(15.0f, 15.0f, 1, 1),
     lampModel(mat4(1.0f)),
     torusModel(mat4(1.0f)),
     planeModel(mat4(1.0f)),
-    shadowFBO(0),
-    shadowDepthTex(0),
+    lightPV(mat4(1.0f)),
+    shadowBias(mat4(1.0f)),
+    lightView(mat4(1.0f)),
+    lightProjection(mat4(1.0f)),
     skyboxDayTexture(0),
     skyboxNightTexture(0),
     groundTexture(0),
     groundNormal(0),
     lampTexture(0),
+    shadowFBO(0),
+    shadowDepthTex(0),
     sceneFBO(0),
     sceneColourTex(0),
     sceneDepthTex(0),
@@ -34,7 +38,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     deltaTime(0.0f),
     lastFrame(0.0f),
     timeOfDay(0.0f),
-    dayLength(30.0f)    // in seconds
+    dayLength(60.0f)    // in seconds
 {
     skybox = new SkyBox(50.0f);
 }
@@ -51,6 +55,14 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);    // Automatically bind cursor to window & hide pointer
 
     initSceneFBO(1280, 720);
+    initShadowFBO();
+
+    shadowBias = mat4(
+        vec4(0.5f, 0.0f, 0.0f, 0.0f),
+        vec4(0.0f, 0.5f, 0.0f, 0.0f),
+        vec4(0.0f, 0.0f, 0.5f, 0.0f),
+        vec4(0.5f, 0.5f, 0.5f, 1.0f)
+    );
 
     // -=-=- Load models -=-=-
     // Lamp
@@ -156,6 +168,39 @@ void SceneBasic_Uniform::initSceneFBO(int windowWidth, int windowHeight) {
     sceneFBOProg.setUniform("sceneTex", 0);
 }
 
+void SceneBasic_Uniform::initShadowFBO() {
+    // Create framebuffer object
+    glGenFramebuffers(1, &shadowFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+
+    // Depth buffer texture
+    glGenTextures(1, &shadowDepthTex);
+    glBindTexture(GL_TEXTURE_2D, shadowDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepthTex, 0);
+
+    // Define border
+    float border[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check shadow FBO initialised correctly
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        cerr << "Shadow FBO failed to initialise." << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void SceneBasic_Uniform::compile() {
 	try {
         sceneFBOProg.compileShader("shader/scene_fbo.vert");
@@ -180,6 +225,25 @@ void SceneBasic_Uniform::update(float t) {
     deltaTime = t - lastFrame;
     lastFrame = t;
 
+    // -=-=- Handle Player Input -=-=-
+    // Close window on escape pressed
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, true);
+    }
+    // Time controls
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        timeOfDay += (dayLength / 300);
+    } else if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        timeOfDay -= (dayLength / 300);
+    }
+
+    camera.HandleKeyboard(window, deltaTime);
+
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+    camera.HandleMouse(x, y);
+
+    // -=-=- Handle Day/Night Cycle -=-=-
     timeOfDay += deltaTime;
     if (timeOfDay > dayLength) { timeOfDay -= dayLength; }
 
@@ -215,12 +279,12 @@ void SceneBasic_Uniform::update(float t) {
     prog.setUniform("CameraPos", camera.GetPos());
 
     // Pass lighting and fog variables to default shader
-    prog.setUniform("lights[0].Position", vec4((sunDirection * 12.0f), 0.0f));
+    prog.setUniform("lights[0].Position", vec4(sunDirection, 0.0f));
     prog.setUniform("lights[0].Ld", sunColour * sunIntensity);
     prog.setUniform("lights[0].La", (sunColour * 0.15f) * sunIntensity);
     prog.setUniform("lights[0].Ls", (sunColour * 0.75f) * sunIntensity);
 
-    prog.setUniform("lights[1].Position", vec4((moonDirection * 9.0f), 0.0f));
+    prog.setUniform("lights[1].Position", vec4(moonDirection, 0.0f));
     prog.setUniform("lights[1].Ld", moonColour * moonIntensity);
     prog.setUniform("lights[1].La", (moonColour * 0.15f) * moonIntensity);
     prog.setUniform("lights[1].Ls", (moonColour * 0.55f) * moonIntensity);
@@ -231,29 +295,46 @@ void SceneBasic_Uniform::update(float t) {
     sceneFBOProg.use();
     sceneFBOProg.setUniform("vignetteStrength", mix(-0.7f, 0.05f, moonIntensity));
 
-    // -=-=- Handle Player Input -=-=-
-    // Close window on escape pressed
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
-    }
+    // -=-=- Handle Shadows -=-=-
+    lightFrustum.orient(sunDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+    lightFrustum.setPerspective(60.0f, 1.0f, 1.0f, 50.0f);
 
-    camera.HandleKeyboard(window, deltaTime);
-
-    double x, y;
-    glfwGetCursorPos(window, &x, &y);
-    camera.HandleMouse(x, y);
+    lightPV = shadowBias * lightFrustum.getProjectionMatrix() * lightFrustum.getViewMatrix();
 }
 
 void SceneBasic_Uniform::render() {
+    // -=-=- Pass 1: Shadow Map -=-=-
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glViewport(0, 0, shadowMapWidth, shadowMapHeight);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    lightView = lightFrustum.getViewMatrix();
+    lightProjection = lightFrustum.getProjectionMatrix();
+
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.5f, 10.0f);
+
+    renderSceneObjects(true);
+
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // -=-=- Pass 2: Main Scene FBO -=-=-
     // Render scene into FBO
     glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+    glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    renderSceneObjects();
+    // Assign shadow map
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, shadowDepthTex);
 
+    prog.use();
+    prog.setUniform("ShadowMap", 5);
+
+    renderSceneObjects(false);
+
+    // -=-=- Pass 3: Post Processing -=-=-
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Render fullscreen as quad using FBO shaders
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     sceneFBOProg.use();
@@ -264,44 +345,48 @@ void SceneBasic_Uniform::render() {
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
-void SceneBasic_Uniform::renderSceneObjects() {
-    view = camera.GetView();
+void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
+    if (!isShadowPass) {
+        view = camera.GetView();
 
-    // -=-=- Skybox -=-=-
-    glDepthFunc(GL_LEQUAL);
-    skyboxProg.use();
+        // -=-=- Skybox -=-=-
+        glDepthFunc(GL_LEQUAL);
+        skyboxProg.use();
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxDayTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxNightTexture);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxDayTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxNightTexture);
 
-    mat4 skyboxMVP = projection * mat4(mat3(view)) * mat4(1.0f);
-    skyboxProg.setUniform("MVP", skyboxMVP);
+        mat4 skyboxMVP = projection * mat4(mat3(view)) * mat4(1.0f);
+        skyboxProg.setUniform("MVP", skyboxMVP);
 
-    skybox->render();
-    glDepthFunc(GL_LESS);
+        skybox->render();
+        glDepthFunc(GL_LESS);
+    }
 
     // -=-=- Plane -=-=-
     prog.use();
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, groundTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, groundNormal);
+    if (!isShadowPass) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, groundTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, groundNormal);
 
-    // Materials
-    prog.setUniform("UVScale", 2.0f);
-    prog.setUniform("UseTexture", true);
-    prog.setUniform("UseNormal", true);
-    prog.setUniform("Material.Shininess", 120.0f);
-    prog.setUniform("Material.Alpha", 1.0f);
-    prog.setUniform("Material.Ka", vec3(0.6f));
-    prog.setUniform("Material.Ks", vec3(0.1f));
+        // Materials
+        prog.setUniform("UVScale", 2.0f);
+        prog.setUniform("UseTexture", true);
+        prog.setUniform("UseNormal", true);
+        prog.setUniform("Material.Shininess", 120.0f);
+        prog.setUniform("Material.Alpha", 1.0f);
+        prog.setUniform("Material.Ka", vec3(0.6f));
+        prog.setUniform("Material.Ks", vec3(0.1f));
 
-    // Render
-    setMatrices(planeModel);
-    plane.render();
+        // Render
+        setMatrices(planeModel, isShadowPass);
+        plane.render();
+    }
 
     // -=-=- Torus -=-=-
     // Materials
@@ -314,19 +399,21 @@ void SceneBasic_Uniform::renderSceneObjects() {
     prog.setUniform("Material.Ks", vec3(0.8f));
 
     // Render
-    setMatrices(torusModel);
+    setMatrices(torusModel, isShadowPass);
     torus.render();
 
     // -=-=- Lamp -=-=-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, lampTexture);
+    if (!isShadowPass) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, lampTexture);
+    }
 
     prog.setUniform("UseTexture", true);
     prog.setUniform("Material.Shininess", 80.0f);
     prog.setUniform("Material.Ka", vec3(0.7f));
     prog.setUniform("Material.Ks", vec3(0.4f));
 
-    setMatrices(lampModel);
+    setMatrices(lampModel, isShadowPass);
     lampMesh->render();
 }
 
@@ -337,8 +424,14 @@ void SceneBasic_Uniform::resize(int w, int h) {
     projection = perspective(radians(70.0f), (float)w / h, 0.3f, 100.0f);
 }
 
-void SceneBasic_Uniform::setMatrices(mat4 model) {
+void SceneBasic_Uniform::setMatrices(mat4 model, bool isShadowPass) {
+    if (isShadowPass) {
+        prog.setUniform("MVP", lightProjection * lightView * model);
+    } else {
+        prog.setUniform("MVP", projection * view * model);
+    }
+
     prog.setUniform("ModelMatrix", model);
     prog.setUniform("NormalMatrix", mat3(transpose(inverse(model))));
-    prog.setUniform("MVP", projection * view * model);
+    prog.setUniform("ShadowMatrix", lightPV * model);
 }

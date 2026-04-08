@@ -4,6 +4,7 @@
 in vec3 FragPos;
 in vec2 TexCoord;
 in mat3 TBN;
+in vec4 ShadowCoord;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -31,6 +32,7 @@ uniform struct FogData {
 
 uniform sampler2D DiffuseTex;
 uniform sampler2D NormalTex;
+uniform sampler2DShadow ShadowMap;
 uniform float UVScale;
 uniform bool UseTexture;
 uniform bool UseNormal;
@@ -71,6 +73,15 @@ vec3 blinnPhong(int light, vec3 pos, vec3 normal, vec3 baseColour) {
     }
 
     return (ambient + diffuse + specular) * attenuation;
+}
+
+
+float getShadow(vec4 shadowCoord) {
+    if (shadowCoord.z <= 0.0f) {
+        return 1.0f;
+    }
+
+    return textureProj(ShadowMap, shadowCoord);
 }
 
 
@@ -116,7 +127,14 @@ void main() {
     vec3 shadingColour = vec3(0.0f);
 
     for (int i = 0; i < numLights; i++) {
-        shadingColour += blinnPhong(i, FragPos, normal, baseColour);
+        float shadowFactor = 1.0f;
+
+        // Only generate shadows for the sun
+        if (i == 0) {
+            shadowFactor = getShadow(ShadowCoord);
+        }
+
+        shadingColour += blinnPhong(i, FragPos, normal, baseColour) * shadowFactor;
     }
 
     vec3 finalColour = mix(Fog.Colour, shadingColour, fogFactor);
