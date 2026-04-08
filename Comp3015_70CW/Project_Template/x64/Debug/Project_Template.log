@@ -1,16 +1,4 @@
-﻿  glad.c
-  glslprogram.cpp
-  glutils.cpp
-  objmesh.cpp
-C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(189,41): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(195,48): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(199,43): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
-  plane.cpp
-  skybox.cpp
-  stb_image.cpp
-  texture.cpp
-  torus.cpp
-  trianglemesh.cpp
+﻿  frustum.cpp
   main.cpp
   scenebasic_uniform.cpp
   Generating Code...

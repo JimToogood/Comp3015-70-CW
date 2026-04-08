@@ -63,6 +63,9 @@
     <ClCompile Include="glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="helper\frustum.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader\basic_uniform.frag">
@@ -77,10 +80,10 @@
     <None Include="shader\skybox.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shader\fbo.frag">
+    <None Include="shader\scene_fbo.frag">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shader\fbo.vert">
+    <None Include="shader\scene_fbo.vert">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
@@ -134,6 +137,9 @@
       <Filter>helper</Filter>
     </ClInclude>
     <ClInclude Include="helper\texture.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="helper\frustum.h">
       <Filter>helper</Filter>
     </ClInclude>
   </ItemGroup>

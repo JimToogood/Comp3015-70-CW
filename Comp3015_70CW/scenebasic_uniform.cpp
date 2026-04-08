@@ -11,40 +11,30 @@ using namespace glm;
 
 SceneBasic_Uniform::SceneBasic_Uniform() :
     window(nullptr),
+    shadowMapWidth(512),
+    shadowMapHeight(512),
+    torus(0.7f, 0.3f, 100, 100),
     plane(15.0f, 15.0f, 1, 1),
-    houseModel(mat4(1.0f)),
-    houseModel2(mat4(1.0f)),
     lampModel(mat4(1.0f)),
-    wallModel(mat4(1.0f)),
-    treeModel(mat4(1.0f)),
-    treeModel2(mat4(1.0f)),
-    treeModel3(mat4(1.0f)),
+    torusModel(mat4(1.0f)),
     planeModel(mat4(1.0f)),
-    pathModel(mat4(1.0f)),
+    shadowFBO(0),
+    shadowDepthTex(0),
     skyboxDayTexture(0),
     skyboxNightTexture(0),
     groundTexture(0),
     groundNormal(0),
-    houseTexture(0),
-    houseTexture2(0),
-    houseNormal(0),
     lampTexture(0),
-    pathTexture(0),
-    pathNormal(0),
-    wallTexture(0),
-    wallNormal(0),
-    branchTexture(0),
-    trunkTexture(0),
-    FBO(0),
-    FBOColourTexture(0),
-    FBODepthTexture(0),
+    sceneFBO(0),
+    sceneColourTex(0),
+    sceneDepthTex(0),
     screenQuadVAO(0),
     screenQuadVBO(0),
     camera(1280, 720),
     deltaTime(0.0f),
     lastFrame(0.0f),
     timeOfDay(0.0f),
-    dayLength(60.0f)    // in seconds
+    dayLength(30.0f)    // in seconds
 {
     skybox = new SkyBox(50.0f);
 }
@@ -60,21 +50,11 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);    // Automatically bind cursor to window & hide pointer
 
-    initFBO(1280, 720);
+    initSceneFBO(1280, 720);
 
     // -=-=- Load models -=-=-
-    // House
-    houseMesh = ObjMesh::load("media/house.obj", false, true);
-
     // Lamp
     lampMesh = ObjMesh::load("media/lamp.obj", false);
-
-    // Wall
-    wallMesh = ObjMesh::load("media/wall.obj", false, true);
-
-    // Tree
-    branchMesh = ObjMesh::load("media/branch.obj", false);
-    trunkMesh = ObjMesh::load("media/trunk.obj", false);
 
     // -=-=- Load textures -=-=-
     // Skybox
@@ -84,24 +64,9 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     // Ground
     groundTexture = Texture::loadTexture("media/grass.jpg");
     groundNormal = Texture::loadTexture("media/grass_normal.jpg");
-    pathTexture = Texture::loadTexture("media/path.png");
-    pathNormal = Texture::loadTexture("media/path_normal.png");
-
-    // House
-    houseTexture = Texture::loadTexture("media/house.png");
-    houseTexture2 = Texture::loadTexture("media/house2.png");
-    houseNormal = Texture::loadTexture("media/house_normal.png");
 
     // Lamp
     lampTexture = Texture::loadTexture("media/lamp.png");
-
-    // Wall
-    wallTexture = Texture::loadTexture("media/wall.png");
-    wallNormal = Texture::loadTexture("media/wall_normal.png");
-
-    // Tree
-    branchTexture = Texture::loadTexture("media/branch.png");
-    trunkTexture = Texture::loadTexture("media/trunk.jpg");
 
     // Assign textures to shaders
     skyboxProg.use();
@@ -113,35 +78,12 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     prog.setUniform("NormalTex", 1);
 
     // Model transforms 
-    houseModel = rotate(houseModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
-    houseModel = scale(houseModel, vec3(0.5f));
-    houseModel = translate(houseModel, vec3(0.91f, 0.0f, 8.98f));
-
-    houseModel2 = rotate(houseModel2, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
-    houseModel2 = scale(houseModel2, vec3(0.35f));
-    houseModel2 = translate(houseModel2, vec3(6.56f, 0.0f, 13.05f));
-
     lampModel = rotate(lampModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
     lampModel = translate(lampModel, vec3(1.43f, 0.0f, 0.41f));
 
-    pathModel = translate(planeModel, vec3(0.0f, 0.0001f, 0.0f));
-    pathModel = scale(pathModel, vec3(0.5f));
-
-    wallModel = rotate(wallModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
-    wallModel = scale(wallModel, vec3(0.8f));
-    wallModel = translate(wallModel, vec3(0.0f, -0.13f, 0.0f));
-
-    treeModel = rotate(treeModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
-    treeModel = scale(treeModel, vec3(0.4f));
-    treeModel = translate(treeModel, vec3(-4.13f, 0.0f, -9.92f));
-
-    treeModel2 = translate(treeModel, vec3(-5.71f, 0.0f, 13.58f));
-    treeModel2 = rotate(treeModel2, radians(50.0f), vec3(0.0f, 1.0f, 0.0f));
-    treeModel2 = scale(treeModel2, vec3(0.9f));
-
-    treeModel3 = translate(treeModel, vec3(13.91f, 0.0f, 14.88f));
-    treeModel3 = rotate(treeModel3, radians(130.0f), vec3(0.0f, 1.0f, 0.0f));
-    treeModel3 = scale(treeModel3, vec3(0.7f));
+    torusModel = rotate(torusModel, radians(-35.0f), vec3(1.0f, 0.0f, 0.0f));
+    torusModel = rotate(torusModel, radians(15.0f), vec3(0.0f, 1.0f, 0.0f));
+    torusModel = translate(torusModel, vec3(1.0f, 1.1f, 2.0f));
 
     projection = mat4(1.0f);
     view = camera.GetView();
@@ -150,35 +92,37 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     prog.setUniform("numLights", 3);
 
     // Lamp light
-    const vec3 lampColour = vec3(1.0f, 0.9f, 0.0f) * 0.07f;
-    prog.setUniform("lights[2].Position", lampModel * vec4(0.0f, 1.4f, -0.7f, 1.0f));
+    vec3 lampPosition = vec3(lampModel * vec4(0.0f, 1.4f, -0.7f, 1.0f));
+    prog.setUniform("lights[2].Position", vec4(lampPosition, 1.0f));
+
+    const vec3 lampColour = vec3(1.0f, 0.9f, 0.0f) * 0.09f;
     prog.setUniform("lights[2].Ld", lampColour);
     prog.setUniform("lights[2].La", lampColour * 0.25f);
     prog.setUniform("lights[2].Ls", lampColour);
 }
 
-void SceneBasic_Uniform::initFBO(int windowWidth, int windowHeight) {
-    // Create framebuffer object (FBO)
-    glGenFramebuffers(1, &FBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+void SceneBasic_Uniform::initSceneFBO(int windowWidth, int windowHeight) {
+    // Create framebuffer object
+    glGenFramebuffers(1, &sceneFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
 
     // Colour buffer texture
-    glGenTextures(1, &FBOColourTexture);
-    glBindTexture(GL_TEXTURE_2D, FBOColourTexture);
+    glGenTextures(1, &sceneColourTex);
+    glBindTexture(GL_TEXTURE_2D, sceneColourTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBOColourTexture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColourTex, 0);
 
     // Depth buffer texture
-    glGenTextures(1, &FBODepthTexture);
-    glBindTexture(GL_TEXTURE_2D, FBODepthTexture);
+    glGenTextures(1, &sceneDepthTex);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, windowWidth, windowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, FBODepthTexture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTex, 0);
 
-    // Check FBO initialised correctly
+    // Check scene FBO initialised correctly
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        cerr << "FBO failed to initialise." << endl;
+        cerr << "Scene FBO failed to initialise." << endl;
         exit(EXIT_FAILURE);
     }
 
@@ -208,16 +152,15 @@ void SceneBasic_Uniform::initFBO(int windowWidth, int windowHeight) {
 
     glBindVertexArray(0);
 
-    FBOProg.use();
-    FBOProg.setUniform("sceneTex", 0);
-    FBOProg.setUniform("texelSize", vec2(1.0f / windowWidth, 1.0f / windowHeight));
+    sceneFBOProg.use();
+    sceneFBOProg.setUniform("sceneTex", 0);
 }
 
 void SceneBasic_Uniform::compile() {
 	try {
-        FBOProg.compileShader("shader/fbo.vert");
-        FBOProg.compileShader("shader/fbo.frag");
-        FBOProg.link();
+        sceneFBOProg.compileShader("shader/scene_fbo.vert");
+        sceneFBOProg.compileShader("shader/scene_fbo.frag");
+        sceneFBOProg.link();
 
         skyboxProg.compileShader("shader/skybox.vert");
         skyboxProg.compileShader("shader/skybox.frag");
@@ -253,7 +196,7 @@ void SceneBasic_Uniform::update(float t) {
     float moonIntensity = clamp((moonDirection.y + fade) / (fade * 2.0f), 0.0f, 1.0f);
 
     // Lighting colour
-    const vec3 sunColour = vec3(1.0f, 0.95f, 0.7f);
+    const vec3 sunColour = vec3(0.75f, 0.71f, 0.53f);
     const vec3 moonColour = vec3(0.2f, 0.2f, 0.4f);
 
     // Fog colour
@@ -274,19 +217,19 @@ void SceneBasic_Uniform::update(float t) {
     // Pass lighting and fog variables to default shader
     prog.setUniform("lights[0].Position", vec4((sunDirection * 12.0f), 0.0f));
     prog.setUniform("lights[0].Ld", sunColour * sunIntensity);
-    prog.setUniform("lights[0].La", (sunColour * 0.2f) * sunIntensity);
-    prog.setUniform("lights[0].Ls", sunColour * sunIntensity);
+    prog.setUniform("lights[0].La", (sunColour * 0.15f) * sunIntensity);
+    prog.setUniform("lights[0].Ls", (sunColour * 0.75f) * sunIntensity);
 
     prog.setUniform("lights[1].Position", vec4((moonDirection * 9.0f), 0.0f));
     prog.setUniform("lights[1].Ld", moonColour * moonIntensity);
-    prog.setUniform("lights[1].La", (moonColour * 0.25f) * moonIntensity);
+    prog.setUniform("lights[1].La", (moonColour * 0.15f) * moonIntensity);
     prog.setUniform("lights[1].Ls", (moonColour * 0.55f) * moonIntensity);
 
     prog.setUniform("Fog.Density", mix(0.04f, 0.12f, moonIntensity));
     prog.setUniform("Fog.Colour", mix(fogDay, fogNight, moonIntensity));
 
-    FBOProg.use();
-    FBOProg.setUniform("vignetteStrength", mix(-0.7f, 0.05f, moonIntensity));
+    sceneFBOProg.use();
+    sceneFBOProg.setUniform("vignetteStrength", mix(-0.7f, 0.05f, moonIntensity));
 
     // -=-=- Handle Player Input -=-=-
     // Close window on escape pressed
@@ -303,7 +246,7 @@ void SceneBasic_Uniform::update(float t) {
 
 void SceneBasic_Uniform::render() {
     // Render scene into FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     renderSceneObjects();
@@ -313,9 +256,9 @@ void SceneBasic_Uniform::render() {
     // Render fullscreen as quad using FBO shaders
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    FBOProg.use();
+    sceneFBOProg.use();
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, FBOColourTexture);
+    glBindTexture(GL_TEXTURE_2D, sceneColourTex);
 
     glBindVertexArray(screenQuadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -339,7 +282,7 @@ void SceneBasic_Uniform::renderSceneObjects() {
     skybox->render();
     glDepthFunc(GL_LESS);
 
-    // -=-=- Grass Plane -=-=-
+    // -=-=- Plane -=-=-
     prog.use();
 
     glActiveTexture(GL_TEXTURE0);
@@ -360,82 +303,25 @@ void SceneBasic_Uniform::renderSceneObjects() {
     setMatrices(planeModel);
     plane.render();
 
-    // -=-=- Path -=-=-=
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, pathTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, pathNormal);
-
+    // -=-=- Torus -=-=-
+    // Materials
     prog.setUniform("UVScale", 1.0f);
-    prog.setUniform("Material.Ks", vec3(0.3f));
+    prog.setUniform("UseTexture", false);
+    prog.setUniform("UseNormal", false);
+    prog.setUniform("Material.Shininess", 100.0f);
+    prog.setUniform("Material.Kd", vec3(0.9f, 0.55f, 0.2f));
+    prog.setUniform("Material.Ka", vec3(0.45f, 0.27f, 0.1f));
+    prog.setUniform("Material.Ks", vec3(0.8f));
 
-    setMatrices(pathModel);
-    plane.render();
-
-    // -=-=- Wall -=-=-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, wallTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, wallNormal);
-
-    prog.setUniform("Material.Shininess", 50.0f);
-    prog.setUniform("Material.Ks", vec3(0.5f));
-
-    setMatrices(wallModel);
-    wallMesh->render();
-
-    // -=-=- Houses -=-=-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, houseTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, houseNormal);
-
-    prog.setUniform("Material.Shininess", 80.0f);
-    prog.setUniform("Material.Ka", vec3(0.7f));
-    prog.setUniform("Material.Ks", vec3(0.4f));
-
-    // Render house 1
-    setMatrices(houseModel);
-    houseMesh->render();
-
-    // Render house 2
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, houseTexture2);
-    setMatrices(houseModel2);
-    houseMesh->render();
-
-    // -=-=- Tree -=-=-
-    prog.setUniform("Material.Shininess", 140.0f);
-    prog.setUniform("Material.Ka", vec3(0.8f));
-    prog.setUniform("Material.Ks", vec3(0.1f));
-
-    // Branches
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, branchTexture);
-
-    setMatrices(treeModel);
-    branchMesh->render();
-    setMatrices(treeModel2);
-    branchMesh->render();
-    setMatrices(treeModel3);
-    branchMesh->render();
-
-    // Trunk
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, trunkTexture);
-
-    setMatrices(treeModel);
-    trunkMesh->render();
-    setMatrices(treeModel2);
-    trunkMesh->render();
-    setMatrices(treeModel3);
-    trunkMesh->render();
+    // Render
+    setMatrices(torusModel);
+    torus.render();
 
     // -=-=- Lamp -=-=-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, lampTexture);
 
-    prog.setUniform("UseNormal", false);
+    prog.setUniform("UseTexture", true);
     prog.setUniform("Material.Shininess", 80.0f);
     prog.setUniform("Material.Ka", vec3(0.7f));
     prog.setUniform("Material.Ks", vec3(0.4f));

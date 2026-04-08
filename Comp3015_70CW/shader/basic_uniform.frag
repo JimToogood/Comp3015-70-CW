@@ -10,7 +10,7 @@ layout (location = 0) out vec4 FragColor;
 uniform int numLights;
 
 uniform struct LightData {
-    vec4 Position;
+    vec4 Position;  // w = 0 means Directional, w = 1 means Point
     vec3 Ld;        // Diffuse
     vec3 La;        // Ambient
     vec3 Ls;        // Specular
@@ -39,13 +39,22 @@ uniform vec3 CameraPos;
 
 vec3 blinnPhong(int light, vec3 pos, vec3 normal, vec3 baseColour) {
     vec3 ambient = lights[light].La * baseColour;
+    
+    vec3 lightDir;
+    float attenuation = 1.0f;
 
-    vec3 lightVector = vec3(lights[light].Position) - pos;
-    vec3 lightDir = normalize(lightVector);
-    float distance = length(lightVector);
+    if (lights[light].Position.w == 0.0f) {
+        // Directional light (sun and moon)
+        lightDir = normalize(vec3(lights[light].Position));
+    } else {
+        // Point light
+        vec3 lightVector = vec3(lights[light].Position) - pos;
+        float distance = length(lightVector);
+        lightDir = normalize(lightVector);
 
-    // Lighting affects objects less when they are further away
-    float attenuation  = 7.0f / distance;
+        // Lighting affects objects less when they are further away
+        attenuation = 7.0f / distance;
+    }
 
     float sDotN = max(dot(normal, lightDir), 0.0f);
     vec3 diffuse = lights[light].Ld * baseColour * sDotN;

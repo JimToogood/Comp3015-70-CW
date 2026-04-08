@@ -6,10 +6,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "helper/scene.h"
 #include "helper/glslprogram.h"
+#include "helper/torus.h"
 #include "helper/plane.h"
 #include "helper/objmesh.h"
 #include "helper/texture.h"
 #include "helper/skybox.h"
+#include "helper/frustum.h"
 #include "camera.h"
 
 using namespace std;
@@ -21,7 +23,7 @@ public:
     SceneBasic_Uniform();
 
     void initScene(GLFWwindow* window);
-    void initFBO(int windowWidth, int windowHeight);
+    void initSceneFBO(int windowWidth, int windowHeight);
     void update(float t);
     void render();
     void renderSceneObjects();
@@ -30,46 +32,38 @@ public:
 private:
     GLSLProgram prog;
     GLSLProgram skyboxProg;
-    GLSLProgram FBOProg;
+    GLSLProgram sceneFBOProg;
     GLFWwindow* window;
+    
+    int shadowMapWidth;
+    int shadowMapHeight;
 
+    Torus torus;
     Plane plane;
     SkyBox* skybox;
+    Frustum lightFrustum;
 
-    unique_ptr<ObjMesh> houseMesh;
-    mat4 houseModel;
-    mat4 houseModel2;
     unique_ptr<ObjMesh> lampMesh;
     mat4 lampModel;
-    unique_ptr<ObjMesh> wallMesh;
-    mat4 wallModel;
-    unique_ptr<ObjMesh> branchMesh;
-    unique_ptr<ObjMesh> trunkMesh;
-    mat4 treeModel;
-    mat4 treeModel2;
-    mat4 treeModel3;
+    mat4 torusModel;
     mat4 planeModel;
-    mat4 pathModel;
+
+    mat4 lightPV;
+    mat4 shadowBias;
+
+    GLuint shadowFBO;
+    GLuint shadowDepthTex;
 
     GLuint skyboxDayTexture;
     GLuint skyboxNightTexture;
 
     GLuint groundTexture;
     GLuint groundNormal;
-    GLuint houseTexture;
-    GLuint houseTexture2;
-    GLuint houseNormal;
     GLuint lampTexture;
-    GLuint pathTexture;
-    GLuint pathNormal;
-    GLuint wallTexture;
-    GLuint wallNormal;
-    GLuint branchTexture;
-    GLuint trunkTexture;
 
-    GLuint FBO;
-    GLuint FBOColourTexture;
-    GLuint FBODepthTexture;
+    GLuint sceneFBO;
+    GLuint sceneColourTex;
+    GLuint sceneDepthTex;
     GLuint screenQuadVAO;
     GLuint screenQuadVBO;
 
