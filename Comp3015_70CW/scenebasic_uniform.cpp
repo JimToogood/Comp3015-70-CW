@@ -13,6 +13,10 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     window(nullptr),
     shadowMapWidth(2048),
     shadowMapHeight(2048),
+    samplesU(4),
+    samplesV(8),
+    jitterMapSize(8),
+    radius(5.0f),
     torus(0.7f, 0.3f, 100, 100),
     plane(15.0f, 15.0f, 1, 1),
     lampModel(mat4(1.0f)),
@@ -29,6 +33,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     lampTexture(0),
     shadowFBO(0),
     shadowDepthTex(0),
+    offsetTex(0),
     sceneFBO(0),
     sceneColourTex(0),
     sceneDepthTex(0),
@@ -55,7 +60,8 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);    // Automatically bind cursor to window & hide pointer
 
     initSceneFBO(1280, 720);
-    initShadowFBO();
+    initShadow();
+    buildJitterTex();
 
     shadowBias = mat4(
         vec4(0.5f, 0.0f, 0.0f, 0.0f),
@@ -88,6 +94,9 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     prog.use();
     prog.setUniform("DiffuseTex", 0);
     prog.setUniform("NormalTex", 1);
+    prog.setUniform("OffsetTex", 1);
+    prog.setUniform("Radius", radius / float(shadowMapWidth));
+    prog.setUniform("OffsetTexSize", vec3(jitterMapSize, jitterMapSize, samplesU * samplesV / 2.0f));
 
     // Model transforms 
     lampModel = rotate(lampModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
@@ -168,7 +177,7 @@ void SceneBasic_Uniform::initSceneFBO(int windowWidth, int windowHeight) {
     sceneFBOProg.setUniform("sceneTex", 0);
 }
 
-void SceneBasic_Uniform::initShadowFBO() {
+void SceneBasic_Uniform::initShadow() {
     // Create framebuffer object
     glGenFramebuffers(1, &shadowFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
@@ -275,6 +284,10 @@ void SceneBasic_Uniform::update(float t) {
     skyboxProg.setUniform("sunColour", sunColour * sunIntensity);
     skyboxProg.setUniform("moonColour", moonColour * moonIntensity);
 
+    // Pass scene fbo variables to scene fbo shader
+    sceneFBOProg.use();
+    sceneFBOProg.setUniform("vignetteStrength", mix(-0.7f, 0.05f, moonIntensity));
+
     prog.use();
     prog.setUniform("CameraPos", camera.GetPos());
 
@@ -292,14 +305,22 @@ void SceneBasic_Uniform::update(float t) {
     prog.setUniform("Fog.Density", mix(0.04f, 0.12f, moonIntensity));
     prog.setUniform("Fog.Colour", mix(fogDay, fogNight, moonIntensity));
 
-    sceneFBOProg.use();
-    sceneFBOProg.setUniform("vignetteStrength", mix(-0.7f, 0.05f, moonIntensity));
-
     // -=-=- Handle Shadows -=-=-
-    lightFrustum.orient(sunDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
-    lightFrustum.setPerspective(60.0f, 1.0f, 1.0f, 50.0f);
+    // TODO: Fix obvious snap on transition between sun and moon shadows
+    int shadowCastingLight;
+    if (moonIntensity > sunIntensity) {
+        shadowCastingLight = 1;
+        lightFrustum.orient(moonDirection * 7.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+    } else {
+        shadowCastingLight = 0;
+        lightFrustum.orient(sunDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+    }
 
+    lightFrustum.setPerspective(60.0f, 1.0f, 1.0f, 50.0f);
     lightPV = shadowBias * lightFrustum.getProjectionMatrix() * lightFrustum.getViewMatrix();
+
+    prog.setUniform("ShadowCastingLight", shadowCastingLight);
+    prog.setUniform("ShadowStrength", mix(0.3f, 1.0f, sunIntensity));
 }
 
 void SceneBasic_Uniform::render() {
@@ -363,12 +384,10 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
 
         skybox->render();
         glDepthFunc(GL_LESS);
-    }
 
-    // -=-=- Plane -=-=-
-    prog.use();
+        // -=-=- Plane -=-=-
+        prog.use();
 
-    if (!isShadowPass) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, groundTexture);
         glActiveTexture(GL_TEXTURE1);
@@ -390,6 +409,7 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
 
     // -=-=- Torus -=-=-
     // Materials
+    prog.use();
     prog.setUniform("UVScale", 1.0f);
     prog.setUniform("UseTexture", false);
     prog.setUniform("UseNormal", false);
@@ -406,9 +426,10 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
     if (!isShadowPass) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, lampTexture);
-    }
 
-    prog.setUniform("UseTexture", true);
+        prog.setUniform("UseTexture", true);
+    }
+    
     prog.setUniform("Material.Shininess", 80.0f);
     prog.setUniform("Material.Ka", vec3(0.7f));
     prog.setUniform("Material.Ks", vec3(0.4f));
@@ -434,4 +455,66 @@ void SceneBasic_Uniform::setMatrices(mat4 model, bool isShadowPass) {
     prog.setUniform("ModelMatrix", model);
     prog.setUniform("NormalMatrix", mat3(transpose(inverse(model))));
     prog.setUniform("ShadowMatrix", lightPV * model);
+}
+
+void SceneBasic_Uniform::buildJitterTex() {
+    int size = jitterMapSize;
+    int samples = samplesU * samplesV;
+    int layers = samples / 2;
+
+    size_t totalFloats = size_t(size * size * layers) * 4;
+    vector<float> data(totalFloats, 0.0f);
+
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            for (int k = 0; k < samples; k += 2) {
+                int x1 = k % samplesU;
+                int y1 = (samples - 1 - k) / samplesU;
+                int x2 = (k + 1) % samplesU;
+                int y2 = (samples - 1 - k - 1) / samplesU;
+
+                // Centre on grid and jitter
+                vec4 v;
+                v.x = (x1 + 0.5f) + jitter();
+                v.y = (y1 + 0.5f) + jitter();
+                v.z = (x2 + 0.5f) + jitter();
+                v.w = (y2 + 0.5f) + jitter();
+
+                // Scale between 0 and 1
+                v.x /= samplesU;
+                v.y /= samplesV;
+                v.z /= samplesU;
+                v.w /= samplesV;
+
+                size_t layer = size_t(k / 2);
+                size_t cell = (size_t(layer * size * size) + size_t(j * size) + size_t(i)) * 4;
+
+                // Warp to disk
+                data[cell + 0] = sqrtf(v.y) * cosf(two_pi<float>() * v.x);
+                data[cell + 1] = sqrtf(v.y) * sinf(two_pi<float>() * v.x);
+                data[cell + 2] = sqrtf(v.w) * cosf(two_pi<float>() * v.z);
+                data[cell + 3] = sqrtf(v.w) * sinf(two_pi<float>() * v.z);
+            }
+        }
+    }
+
+    glActiveTexture(GL_TEXTURE1);
+    glGenTextures(1, &offsetTex);
+    glBindTexture(GL_TEXTURE_3D, offsetTex);
+
+    glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA32F, size, size, layers);
+    glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, size, size, layers, GL_RGBA, GL_FLOAT, data.data());
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+}
+
+float SceneBasic_Uniform::jitter() {
+    static default_random_engine generator;
+    static uniform_real_distribution<float> distrib(-0.5f, 0.5f);
+
+    return distrib(generator);
 }

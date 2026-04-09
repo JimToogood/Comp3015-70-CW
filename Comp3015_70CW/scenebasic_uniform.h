@@ -12,6 +12,7 @@
 #include "helper/texture.h"
 #include "helper/skybox.h"
 #include "helper/frustum.h"
+#include "helper/random.h"
 #include "camera.h"
 
 using namespace std;
@@ -24,7 +25,7 @@ public:
 
     void initScene(GLFWwindow* window);
     void initSceneFBO(int windowWidth, int windowHeight);
-    void initShadowFBO();
+    void initShadow();
     void update(float t);
     void render();
     void renderSceneObjects(bool isShadowPass);
@@ -38,6 +39,11 @@ private:
     
     int shadowMapWidth;
     int shadowMapHeight;
+
+    int samplesU;
+    int samplesV;
+    int jitterMapSize;
+    float radius;
 
     Torus torus;
     Plane plane;
@@ -63,6 +69,7 @@ private:
 
     GLuint shadowFBO;
     GLuint shadowDepthTex;
+    GLuint offsetTex;
 
     GLuint sceneFBO;
     GLuint sceneColourTex;
@@ -78,6 +85,8 @@ private:
 
     void setMatrices(mat4 model, bool isShadowPass);
     void compile();
+    void buildJitterTex();
+    float jitter();
 };
 
 #endif  // SCENEBASIC_UNIFORM_H

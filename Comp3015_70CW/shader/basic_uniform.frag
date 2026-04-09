@@ -32,11 +32,17 @@ uniform struct FogData {
 
 uniform sampler2D DiffuseTex;
 uniform sampler2D NormalTex;
-uniform sampler2DShadow ShadowMap;
 uniform float UVScale;
 uniform bool UseTexture;
 uniform bool UseNormal;
 uniform vec3 CameraPos;
+
+uniform sampler2DShadow ShadowMap;
+uniform sampler3D OffsetTex;
+uniform vec3 OffsetTexSize;
+uniform float Radius;
+uniform int ShadowCastingLight;
+uniform float ShadowStrength;
 
 
 vec3 blinnPhong(int light, vec3 pos, vec3 normal, vec3 baseColour) {
@@ -77,11 +83,51 @@ vec3 blinnPhong(int light, vec3 pos, vec3 normal, vec3 baseColour) {
 
 
 float getShadow(vec4 shadowCoord) {
-    if (shadowCoord.z <= 0.0f) {
-        return 1.0f;
+    float sum = 0.0f;
+    float shadow = 1.0f;
+    ivec3 offsetCoord;
+
+    offsetCoord.xy = ivec2(gl_FragCoord.xy) % ivec2(OffsetTexSize.xy);
+    int samplesDiv2 = int(OffsetTexSize.z);
+
+    vec4 sc = shadowCoord;
+
+    if (sc.z >= 0.0f && sc.z <= sc.w) {
+        float bias = 0.0005f;
+        sc.z -= bias * sc.w;
+
+        for (int i = 0; i < 4; i++) {
+            offsetCoord.z = i;
+            vec4 offsets = texelFetch(OffsetTex, offsetCoord, 0) * Radius * shadowCoord.w;
+
+            sc.xy = shadowCoord.xy + offsets.xy;
+            sum += textureProj(ShadowMap, sc);
+
+            sc.xy = shadowCoord.xy + offsets.zw;
+            sum += textureProj(ShadowMap, sc);
+        }
+        
+        shadow = sum / 8.0f;
+
+        if (shadow > 0.0f && shadow < 1.0f) {
+            sum = 0.0f;
+
+            for (int i = 0; i < samplesDiv2; i++) {
+                offsetCoord.z = i;
+                vec4 offsets = texelFetch(OffsetTex, offsetCoord, 0) * Radius * shadowCoord.w;
+
+                sc.xy = shadowCoord.xy + offsets.xy;
+                sum += textureProj(ShadowMap, sc);
+
+                sc.xy = shadowCoord.xy + offsets.zw;
+                sum += textureProj(ShadowMap, sc);
+            }
+
+            shadow = sum / float(samplesDiv2 * 2);
+        }
     }
 
-    return textureProj(ShadowMap, shadowCoord);
+    return shadow;
 }
 
 
@@ -130,8 +176,8 @@ void main() {
         float shadowFactor = 1.0f;
 
         // Only generate shadows for the sun
-        if (i == 0) {
-            shadowFactor = getShadow(ShadowCoord);
+        if (i == ShadowCastingLight) {
+            shadowFactor = getShadow(ShadowCoord) * ShadowStrength;
         }
 
         shadingColour += blinnPhong(i, FragPos, normal, baseColour) * shadowFactor;
