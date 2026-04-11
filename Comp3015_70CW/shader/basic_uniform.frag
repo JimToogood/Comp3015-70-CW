@@ -175,9 +175,9 @@ void main() {
     for (int i = 0; i < numLights; i++) {
         float shadowFactor = 1.0f;
 
-        // Only generate shadows for the sun
         if (i == ShadowCastingLight) {
-            shadowFactor = getShadow(ShadowCoord) * ShadowStrength;
+            float shadow = getShadow(ShadowCoord);
+            shadowFactor = mix(1.0f, shadow, ShadowStrength);
         }
 
         shadingColour += blinnPhong(i, FragPos, normal, baseColour) * shadowFactor;

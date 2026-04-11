@@ -306,11 +306,10 @@ void SceneBasic_Uniform::update(float t) {
     prog.setUniform("Fog.Colour", mix(fogDay, fogNight, moonIntensity));
 
     // -=-=- Handle Shadows -=-=-
-    // TODO: Fix obvious snap on transition between sun and moon shadows
     int shadowCastingLight;
     if (moonIntensity > sunIntensity) {
         shadowCastingLight = 1;
-        lightFrustum.orient(moonDirection * 7.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+        lightFrustum.orient(moonDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
     } else {
         shadowCastingLight = 0;
         lightFrustum.orient(sunDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
@@ -320,7 +319,7 @@ void SceneBasic_Uniform::update(float t) {
     lightPV = shadowBias * lightFrustum.getProjectionMatrix() * lightFrustum.getViewMatrix();
 
     prog.setUniform("ShadowCastingLight", shadowCastingLight);
-    prog.setUniform("ShadowStrength", mix(0.3f, 1.0f, sunIntensity));
+    prog.setUniform("ShadowStrength", abs(sunIntensity - moonIntensity));
 }
 
 void SceneBasic_Uniform::render() {
