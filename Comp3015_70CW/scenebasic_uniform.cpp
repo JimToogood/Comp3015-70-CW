@@ -115,11 +115,7 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     // Lamp light
     vec3 lampPosition = vec3(lampModel * vec4(0.0f, 1.4f, -0.7f, 1.0f));
     prog.setUniform("lights[2].Position", vec4(lampPosition, 1.0f));
-
-    const vec3 lampColour = vec3(1.0f, 0.9f, 0.0f) * 0.09f;
-    prog.setUniform("lights[2].Ld", lampColour);
-    prog.setUniform("lights[2].La", lampColour * 0.25f);
-    prog.setUniform("lights[2].Ls", lampColour);
+    prog.setUniform("lights[2].Ld", vec3(1.0f, 0.9f, 0.0f) * 17.0f);
 }
 
 void SceneBasic_Uniform::initSceneFBO(int windowWidth, int windowHeight) {
@@ -269,8 +265,8 @@ void SceneBasic_Uniform::update(float t) {
     float moonIntensity = clamp((moonDirection.y + fade) / (fade * 2.0f), 0.0f, 1.0f);
 
     // Lighting colour
-    const vec3 sunColour = vec3(0.75f, 0.71f, 0.53f);
-    const vec3 moonColour = vec3(0.2f, 0.2f, 0.4f);
+    const vec3 sunColour = vec3(0.75f, 0.71f, 0.53f) * 3.7f;
+    const vec3 moonColour = vec3(0.2f, 0.2f, 0.4f) * 3.2f;
 
     // Fog colour
     const vec3 fogDay = vec3(0.7f, 0.8f, 0.9f);
@@ -294,15 +290,11 @@ void SceneBasic_Uniform::update(float t) {
     // Pass lighting and fog variables to default shader
     prog.setUniform("lights[0].Position", vec4(sunDirection, 0.0f));
     prog.setUniform("lights[0].Ld", sunColour * sunIntensity);
-    prog.setUniform("lights[0].La", (sunColour * 0.15f) * sunIntensity);
-    prog.setUniform("lights[0].Ls", (sunColour * 0.75f) * sunIntensity);
 
     prog.setUniform("lights[1].Position", vec4(moonDirection, 0.0f));
     prog.setUniform("lights[1].Ld", moonColour * moonIntensity);
-    prog.setUniform("lights[1].La", (moonColour * 0.15f) * moonIntensity);
-    prog.setUniform("lights[1].Ls", (moonColour * 0.55f) * moonIntensity);
 
-    prog.setUniform("Fog.Density", mix(0.04f, 0.12f, moonIntensity));
+    prog.setUniform("Fog.Density", mix(0.03f, 0.12f, moonIntensity));
     prog.setUniform("Fog.Colour", mix(fogDay, fogNight, moonIntensity));
 
     // -=-=- Handle Shadows -=-=-
@@ -318,6 +310,7 @@ void SceneBasic_Uniform::update(float t) {
     lightFrustum.setPerspective(60.0f, 1.0f, 1.0f, 50.0f);
     lightPV = shadowBias * lightFrustum.getProjectionMatrix() * lightFrustum.getViewMatrix();
 
+    // Pass shadow variables to default shader
     prog.setUniform("ShadowCastingLight", shadowCastingLight);
     prog.setUniform("ShadowStrength", abs(sunIntensity - moonIntensity));
 }
@@ -366,6 +359,8 @@ void SceneBasic_Uniform::render() {
 }
 
 void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
+    prog.setUniform("IsShadowPass", isShadowPass);
+
     if (!isShadowPass) {
         view = camera.GetView();
 
@@ -396,10 +391,9 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
         prog.setUniform("UVScale", 2.0f);
         prog.setUniform("UseTexture", true);
         prog.setUniform("UseNormal", true);
-        prog.setUniform("Material.Shininess", 120.0f);
         prog.setUniform("Material.Alpha", 1.0f);
-        prog.setUniform("Material.Ka", vec3(0.6f));
-        prog.setUniform("Material.Ks", vec3(0.1f));
+        prog.setUniform("Material.Roughness", 0.85f);
+        prog.setUniform("Material.Metallic", 0.0f);
 
         // Render
         setMatrices(planeModel, isShadowPass);
@@ -412,26 +406,22 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
     prog.setUniform("UVScale", 1.0f);
     prog.setUniform("UseTexture", false);
     prog.setUniform("UseNormal", false);
-    prog.setUniform("Material.Shininess", 100.0f);
-    prog.setUniform("Material.Kd", vec3(0.9f, 0.55f, 0.2f));
-    prog.setUniform("Material.Ka", vec3(0.45f, 0.27f, 0.1f));
-    prog.setUniform("Material.Ks", vec3(0.8f));
+    prog.setUniform("Material.Roughness", 0.35f);
+    prog.setUniform("Material.Metallic", 0.0f);
+    prog.setUniform("Material.Albedo", vec3(0.9f, 0.55f, 0.2f));
 
     // Render
     setMatrices(torusModel, isShadowPass);
     torus.render();
 
     // -=-=- Lamp -=-=-
-    if (!isShadowPass) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, lampTexture);
+    // Render textures with transparency even on shadow pass, to ensure transparent sections do not cast shadows
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, lampTexture);
 
-        prog.setUniform("UseTexture", true);
-    }
-    
-    prog.setUniform("Material.Shininess", 80.0f);
-    prog.setUniform("Material.Ka", vec3(0.7f));
-    prog.setUniform("Material.Ks", vec3(0.4f));
+    prog.setUniform("UseTexture", true);
+    prog.setUniform("Material.Roughness", 0.4f);
+    prog.setUniform("Material.Metallic", 0.4f);
 
     setMatrices(lampModel, isShadowPass);
     lampMesh->render();
