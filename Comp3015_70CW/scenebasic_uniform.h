@@ -6,7 +6,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "helper/scene.h"
 #include "helper/glslprogram.h"
-#include "helper/torus.h"
 #include "helper/plane.h"
 #include "helper/objmesh.h"
 #include "helper/texture.h"
@@ -45,14 +44,23 @@ private:
     int jitterMapSize;
     float radius;
 
-    Torus torus;
+    Frustum lightFrustum;
     Plane plane;
     SkyBox* skybox;
-    Frustum lightFrustum;
 
+    unique_ptr<ObjMesh> houseMesh;
+    mat4 houseModel;
     unique_ptr<ObjMesh> lampMesh;
     mat4 lampModel;
-    mat4 torusModel;
+    unique_ptr<ObjMesh> wallMesh;
+    mat4 wallModel;
+    unique_ptr<ObjMesh> metalBoxMesh;
+    mat4 metalBoxModel;
+    unique_ptr<ObjMesh> branchMesh;
+    unique_ptr<ObjMesh> trunkMesh;
+    mat4 treeModel;
+    mat4 treeModel2;
+    mat4 treeModel3;
     mat4 planeModel;
 
     mat4 lightPV;
@@ -65,7 +73,15 @@ private:
 
     GLuint groundTexture;
     GLuint groundNormal;
+    GLuint houseTexture;
+    GLuint houseNormal;
     GLuint lampTexture;
+    GLuint metalBoxTexture;
+    GLuint metalBoxNormal;
+    GLuint wallTexture;
+    GLuint wallNormal;
+    GLuint branchTexture;
+    GLuint trunkTexture;
 
     GLuint shadowFBO;
     GLuint shadowDepthTex;

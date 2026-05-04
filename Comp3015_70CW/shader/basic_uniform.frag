@@ -94,8 +94,8 @@ vec3 PBR(int light, vec3 pos, vec3 normal, vec3 albedo) {
     vec3 v = normalize(CameraPos - pos);
     vec3 h = normalize(v + L);
 
-    float nDotL = max(dot(normal, L), 0.0f);
-    float nDotV = max(dot(normal, v), 0.0f);
+    float nDotL = max(dot(normal, L), 0.001f);
+    float nDotV = max(dot(normal, v), 0.001f);
     float nDotH = max(dot(normal, h), 0.0f);
     float lDotH = max(dot(L, h), 0.0f);
 
@@ -223,7 +223,7 @@ void main() {
     }
 
     // Add ambient factor
-    vec3 ambient = 0.05f * baseColour;
+    vec3 ambient = 0.18f * baseColour;
     shadingColour += ambient;
 
     vec3 finalColour = mix(Fog.Colour, shadingColour, fogFactor);

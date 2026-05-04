@@ -1,2 +1,19 @@
-﻿  scenebasic_uniform.cpp
+﻿  glad.c
+  frustum.cpp
+  glslprogram.cpp
+  glutils.cpp
+  objmesh.cpp
+C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(189,41): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(195,48): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\helper\objmesh.cpp(199,43): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
+  plane.cpp
+  skybox.cpp
+  stb_image.cpp
+  texture.cpp
+  torus.cpp
+  trianglemesh.cpp
+  main.cpp
+  scenebasic_uniform.cpp
+  Generating Code...
+LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
   Project_Template.vcxproj -> C:\Users\jimto\OneDrive\Documents\GitHub\Comp3015-70-CW\Comp3015_70CW\x64\Debug\Project_Template.exe

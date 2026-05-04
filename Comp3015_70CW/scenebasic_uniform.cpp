@@ -11,16 +11,20 @@ using namespace glm;
 
 SceneBasic_Uniform::SceneBasic_Uniform() :
     window(nullptr),
-    shadowMapWidth(2048),
-    shadowMapHeight(2048),
+    shadowMapWidth(3000),
+    shadowMapHeight(3000),
     samplesU(4),
     samplesV(8),
     jitterMapSize(8),
     radius(5.0f),
-    torus(0.7f, 0.3f, 100, 100),
     plane(15.0f, 15.0f, 1, 1),
+    houseModel(mat4(1.0f)),
     lampModel(mat4(1.0f)),
-    torusModel(mat4(1.0f)),
+    wallModel(mat4(1.0f)),
+    metalBoxModel(mat4(1.0f)),
+    treeModel(mat4(1.0f)),
+    treeModel2(mat4(1.0f)),
+    treeModel3(mat4(1.0f)),
     planeModel(mat4(1.0f)),
     lightPV(mat4(1.0f)),
     shadowBias(mat4(1.0f)),
@@ -30,7 +34,15 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     skyboxNightTexture(0),
     groundTexture(0),
     groundNormal(0),
+    houseTexture(0),
+    houseNormal(0),
     lampTexture(0),
+    metalBoxTexture(0),
+    metalBoxNormal(0),
+    wallTexture(0),
+    wallNormal(0),
+    branchTexture(0),
+    trunkTexture(0),
     shadowFBO(0),
     shadowDepthTex(0),
     offsetTex(0),
@@ -71,8 +83,21 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     );
 
     // -=-=- Load models -=-=-
+    // House
+    houseMesh = ObjMesh::load("media/house.obj", false, true);
+
     // Lamp
     lampMesh = ObjMesh::load("media/lamp.obj", false);
+
+    // Metal Box
+    metalBoxMesh = ObjMesh::load("media/metal_box.obj", false, true);
+
+    // Wall
+    wallMesh = ObjMesh::load("media/wall.obj", false, true);
+
+    // Tree
+    branchMesh = ObjMesh::load("media/branch.obj", false);
+    trunkMesh = ObjMesh::load("media/trunk.obj", false);
 
     // -=-=- Load textures -=-=-
     // Skybox
@@ -83,8 +108,24 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     groundTexture = Texture::loadTexture("media/grass.jpg");
     groundNormal = Texture::loadTexture("media/grass_normal.jpg");
 
+    // House
+    houseTexture = Texture::loadTexture("media/house.png");
+    houseNormal = Texture::loadTexture("media/house_normal.png");
+
     // Lamp
     lampTexture = Texture::loadTexture("media/lamp.png");
+
+    // Metal Box
+    metalBoxTexture = Texture::loadTexture("media/metal_box.png");
+    metalBoxNormal = Texture::loadTexture("media/metal_box_normal.png");
+
+    // Wall
+    wallTexture = Texture::loadTexture("media/wall.png");
+    wallNormal = Texture::loadTexture("media/wall_normal.png");
+
+    // Tree
+    branchTexture = Texture::loadTexture("media/branch.png");
+    trunkTexture = Texture::loadTexture("media/trunk.jpg");
 
     // Assign textures to shaders
     skyboxProg.use();
@@ -99,12 +140,30 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     prog.setUniform("OffsetTexSize", vec3(jitterMapSize, jitterMapSize, samplesU * samplesV / 2.0f));
 
     // Model transforms 
-    lampModel = rotate(lampModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
-    lampModel = translate(lampModel, vec3(1.43f, 0.0f, 0.41f));
+    houseModel = rotate(houseModel, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
+    houseModel = scale(houseModel, vec3(0.5f));
+    houseModel = translate(houseModel, vec3(1.91f, 0.0f, 2.98f));
 
-    torusModel = rotate(torusModel, radians(-35.0f), vec3(1.0f, 0.0f, 0.0f));
-    torusModel = rotate(torusModel, radians(15.0f), vec3(0.0f, 1.0f, 0.0f));
-    torusModel = translate(torusModel, vec3(1.0f, 1.1f, 2.0f));
+    lampModel = translate(lampModel, vec3(1.23f, 0.0f, 1.41f));
+
+    metalBoxModel = scale(metalBoxModel, vec3(0.3f));
+    metalBoxModel = translate(metalBoxModel, vec3(13.0f, 1.0f, 7.0f));
+
+    wallModel = rotate(wallModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
+    wallModel = scale(wallModel, vec3(0.8f));
+    wallModel = translate(wallModel, vec3(0.0f, -0.13f, 0.0f));
+
+    treeModel = rotate(treeModel, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
+    treeModel = scale(treeModel, vec3(0.4f));
+    treeModel = translate(treeModel, vec3(-4.13f, 0.0f, -9.92f));
+
+    treeModel2 = translate(treeModel, vec3(-5.71f, 0.0f, 13.58f));
+    treeModel2 = rotate(treeModel2, radians(50.0f), vec3(0.0f, 1.0f, 0.0f));
+    treeModel2 = scale(treeModel2, vec3(0.9f));
+
+    treeModel3 = translate(treeModel, vec3(13.91f, 0.0f, 14.88f));
+    treeModel3 = rotate(treeModel3, radians(130.0f), vec3(0.0f, 1.0f, 0.0f));
+    treeModel3 = scale(treeModel3, vec3(0.7f));
 
     projection = mat4(1.0f);
     view = camera.GetView();
@@ -115,7 +174,7 @@ void SceneBasic_Uniform::initScene(GLFWwindow* winIn) {
     // Lamp light
     vec3 lampPosition = vec3(lampModel * vec4(0.0f, 1.4f, -0.7f, 1.0f));
     prog.setUniform("lights[2].Position", vec4(lampPosition, 1.0f));
-    prog.setUniform("lights[2].Ld", vec3(1.0f, 0.9f, 0.0f) * 17.0f);
+    prog.setUniform("lights[2].Ld", vec3(1.0f, 0.9f, 0.0f) * 20.0f);
 }
 
 void SceneBasic_Uniform::initSceneFBO(int windowWidth, int windowHeight) {
@@ -266,7 +325,7 @@ void SceneBasic_Uniform::update(float t) {
 
     // Lighting colour
     const vec3 sunColour = vec3(0.75f, 0.71f, 0.53f) * 3.7f;
-    const vec3 moonColour = vec3(0.2f, 0.2f, 0.4f) * 3.2f;
+    const vec3 moonColour = vec3(0.2f, 0.2f, 0.4f) * 1.5f;
 
     // Fog colour
     const vec3 fogDay = vec3(0.7f, 0.8f, 0.9f);
@@ -301,13 +360,13 @@ void SceneBasic_Uniform::update(float t) {
     int shadowCastingLight;
     if (moonIntensity > sunIntensity) {
         shadowCastingLight = 1;
-        lightFrustum.orient(moonDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+        lightFrustum.orient(moonDirection * 15.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
     } else {
         shadowCastingLight = 0;
-        lightFrustum.orient(sunDirection * 10.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+        lightFrustum.orient(sunDirection * 12.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
     }
 
-    lightFrustum.setPerspective(60.0f, 1.0f, 1.0f, 50.0f);
+    lightFrustum.setPerspective(100.0f, 1.0f, 1.0f, 30.0f);
     lightPV = shadowBias * lightFrustum.getProjectionMatrix() * lightFrustum.getViewMatrix();
 
     // Pass shadow variables to default shader
@@ -398,30 +457,84 @@ void SceneBasic_Uniform::renderSceneObjects(bool isShadowPass) {
         // Render
         setMatrices(planeModel, isShadowPass);
         plane.render();
+
+        // -=-=- House -=-=-
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, houseTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, houseNormal);
+
+        prog.setUniform("UVScale", 1.0f);
+        prog.setUniform("Material.Roughness", 0.55f);
+        prog.setUniform("Material.Metallic", 0.3f);
     }
 
-    // -=-=- Torus -=-=-
-    // Materials
-    prog.use();
-    prog.setUniform("UVScale", 1.0f);
-    prog.setUniform("UseTexture", false);
-    prog.setUniform("UseNormal", false);
-    prog.setUniform("Material.Roughness", 0.35f);
-    prog.setUniform("Material.Metallic", 0.0f);
-    prog.setUniform("Material.Albedo", vec3(0.9f, 0.55f, 0.2f));
+    setMatrices(houseModel, isShadowPass);
+    houseMesh->render();
 
-    // Render
-    setMatrices(torusModel, isShadowPass);
-    torus.render();
+    // -=-=- Metal Box -=-=-
+    if (!isShadowPass) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, metalBoxTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, metalBoxNormal);
+
+        prog.setUniform("Material.Roughness", 0.6f);
+        prog.setUniform("Material.Metallic", 1.0f);
+    }
+
+    setMatrices(metalBoxModel, isShadowPass);
+    metalBoxMesh->render();
+
+    // -=-=- Wall -=-=-
+    if (!isShadowPass) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, wallTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, wallNormal);
+
+        prog.setUniform("Material.Roughness", 0.75f);
+        prog.setUniform("Material.Metallic", 0.2f);
+    }
+
+    setMatrices(wallModel, isShadowPass);
+    wallMesh->render();
+
+    // Render textures with transparency even on shadow pass, to ensure transparent sections do not cast shadows
+    // -=-=- Tree -=-=-
+    prog.setUniform("UseNormal", false);
+    prog.setUniform("Material.Roughness", 0.8f);
+    prog.setUniform("Material.Metallic", 0.0f);
+
+    // Branches
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, branchTexture);
+
+    setMatrices(treeModel, isShadowPass);
+    branchMesh->render();
+    setMatrices(treeModel2, isShadowPass);
+    branchMesh->render();
+    setMatrices(treeModel3, isShadowPass);
+    branchMesh->render();
+
+    // Trunk
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, trunkTexture);
+
+    setMatrices(treeModel, isShadowPass);
+    trunkMesh->render();
+    setMatrices(treeModel2, isShadowPass);
+    trunkMesh->render();
+    setMatrices(treeModel3, isShadowPass);
+    trunkMesh->render();
 
     // -=-=- Lamp -=-=-
-    // Render textures with transparency even on shadow pass, to ensure transparent sections do not cast shadows
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, lampTexture);
 
-    prog.setUniform("UseTexture", true);
+    prog.use();
     prog.setUniform("Material.Roughness", 0.4f);
-    prog.setUniform("Material.Metallic", 0.4f);
+    prog.setUniform("Material.Metallic", 0.2f);
 
     setMatrices(lampModel, isShadowPass);
     lampMesh->render();

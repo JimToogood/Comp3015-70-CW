@@ -15,4 +15,4 @@ branch.obj & trunk.obj - https://www.turbosquid.com/3d-models/shapespark-low-pol
 day_skybox.hdr - https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky  
 night_skybox.hdr - https://polyhaven.com/a/qwantani_moon_noon_puresky  
 grass.jpg - https://www.poliigon.com/texture/flat-grass-texture/4585  
-path.png (based on) - https://freestylized.com/material/ground_stones_01/  
+metal_box.png - https://freestylized.com/material/metal_plates_01/  
